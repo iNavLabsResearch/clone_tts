@@ -81,11 +81,58 @@ def load_audio_for_codec(codec, path: str) -> torch.Tensor:
     return load_audio(path, sample_rate=codec_sample_rate(codec))
 
 
+def normalize_audio_field(audio_field) -> dict | None:
+    """Normalize a HF datasets ``audio`` column value to ``{array, sampling_rate}``.
+
+    Supports legacy dicts (datasets < 4) and ``torchcodec.decoders.AudioDecoder``
+    objects (datasets >= 4, default on Kaggle). Returns None when audio is missing
+    or cannot be decoded.
+    """
+    if audio_field is None:
+        return None
+
+    if isinstance(audio_field, dict):
+        if "array" in audio_field and "sampling_rate" in audio_field:
+            return {
+                "array": np.asarray(audio_field["array"], dtype=np.float32),
+                "sampling_rate": int(audio_field["sampling_rate"]),
+            }
+        path = audio_field.get("path")
+        if path:
+            import soundfile as sf
+
+            arr, sr = sf.read(path, dtype="float32", always_2d=False)
+            return {"array": np.asarray(arr, dtype=np.float32), "sampling_rate": int(sr)}
+        return None
+
+    get_samples = getattr(audio_field, "get_all_samples", None)
+    if callable(get_samples):
+        try:
+            samples = get_samples()
+            data = samples.data
+            if isinstance(data, torch.Tensor):
+                arr = data.detach().cpu().numpy()
+            else:
+                arr = np.asarray(data, dtype=np.float32)
+            if arr.ndim > 1:
+                arr = arr[0] if arr.shape[0] == 1 else arr.mean(axis=0)
+            sr = int(getattr(samples, "sample_rate", 0) or getattr(audio_field, "sample_rate", 0))
+            if sr <= 0:
+                return None
+            return {"array": np.asarray(arr, dtype=np.float32), "sampling_rate": sr}
+        except Exception:
+            return None
+
+    return None
+
+
 def waveform_from_row(audio_field, target_sr: int) -> torch.Tensor:
-    """Convert a HF datasets ``audio`` field ({'array','sampling_rate'}) into a mono
-    torch waveform resampled to ``target_sr``. Returns a 1-D float32 tensor."""
-    array = np.asarray(audio_field["array"], dtype=np.float32)
-    src_sr = int(audio_field["sampling_rate"])
+    """Convert a HF datasets ``audio`` field into a mono torch waveform at ``target_sr``."""
+    audio = normalize_audio_field(audio_field)
+    if audio is None:
+        raise ValueError("Could not decode audio field")
+    array = audio["array"]
+    src_sr = int(audio["sampling_rate"])
     if array.ndim > 1:  # stereo -> mono
         array = array.mean(axis=-1)
     wav = torch.from_numpy(array)

@@ -159,14 +159,14 @@ def main() -> int:
                 continue
             if src.get("state_filter") and str(row.get(src["state_column"])) != src["state_filter"]:
                 continue
-            audio = row.get(src["audio_column"])
-            if not audio or "array" not in audio:
+            audio = codec_utils.normalize_audio_field(row.get(src["audio_column"]))
+            if audio is None:
                 continue
             dur = row.get(src["duration_column"])
             if dur is not None and not (src["min_dur_s"] <= float(dur) <= src["max_dur_s"]):
                 continue
 
-            arr = np.asarray(audio["array"], dtype=np.float32)
+            arr = audio["array"]
             ssr = int(audio["sampling_rate"])
 
             # ASR transcription.
