@@ -1,23 +1,33 @@
 #!/usr/bin/env bash
 # Environment setup for Kaggle 2x T4 (Turing) finetuning of Indic-Mio.
 #
-# Secrets are read from the environment (or secrets.env / Kaggle Secrets) — never hardcoded.
-# Required: HF_TOKEN (with accepted access to ARTPARK-IISc/Vaani), WANDB_API_KEY (optional).
+# Secrets: config.json (huggingface.token, wandb.api_key) with optional secrets.env override.
+# Required: HF token with accepted access to ARTPARK-IISc/Vaani; WANDB_API_KEY optional.
 #
 # Usage:
-#   export HF_TOKEN=hf_xxx   WANDB_API_KEY=xxx
 #   bash setup.sh
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
-# Load secrets.env if present (gitignored).
+# Load secrets.env if present (gitignored); config.json fills in anything still missing.
 if [[ -f secrets.env ]]; then
   echo "[setup] sourcing secrets.env"
   set -a; # shellcheck disable=SC1091
   source secrets.env; set +a
 fi
+
+echo "[setup] resolving secrets from config.json"
+python - <<'PY'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(".").resolve() / "src"))
+from milli_tts.config import load_config, resolve_secrets
+secrets = resolve_secrets(load_config())
+print(f"[setup] HF token: {'set' if secrets.hf_token else 'missing'}")
+print(f"[setup] W&B key: {'set' if secrets.wandb_api_key else 'missing'}")
+PY
 
 echo "[setup] python: $(python --version 2>&1)"
 

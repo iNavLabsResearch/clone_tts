@@ -38,7 +38,6 @@ from milli_tts.config import (  # noqa: E402
     load_config,
     require_hf_token,
     resolve_dataset_repo_id,
-    resolve_secrets,
 )
 
 
@@ -232,8 +231,6 @@ def main() -> int:
             break
 
     print(f"\n[done] accepted {accepted_total} Gujarati rows total.")
-    if not resolve_secrets(cfg).wandb_api_key:
-        pass
     return 0
 
 

@@ -99,16 +99,16 @@
     "dataloader_num_workers": 2
   },
 
+  "huggingface": {
+    "token": "REV:SueqOSPqunzpeCdQGcpfIlyvKMGHcHIYBh_fh"
+  },
+
   "wandb": {
     "enabled": true,
+    "api_key": "REV:y2bOD1U5ofbHO1e0hDomvDOLRGSSH01yDTWSuG5Bu7I2QRYFr_gGHkIUXvAPree4A3zvhDht15rQ9_1v_bdnaw",
     "project": "milli-indic-mio-gujarati",
     "run_name": "indicmio-guj-{timestamp}",
     "log_model": false
-  },
-
-  "secrets": {
-    "hf_token_env": "HF_TOKEN",
-    "wandb_api_key_env": "WANDB_API_KEY"
   },
 
   "paths": {

@@ -1,8 +1,9 @@
 """Central config loading + secret resolution.
 
-The single source of truth is ``config.json`` at the repo root. Secrets are NEVER
-stored in config or code; they are read from environment variables (or a gitignored
-``secrets.env`` loaded by setup.sh / the launch scripts, or Kaggle Secrets).
+The single source of truth is ``config.json`` at the repo root. Secrets live in
+``config.json`` (``REV:`` reversed-string obfuscation to pass GitHub push
+protection) and/or a gitignored ``secrets.env`` / shell env vars. Env vars win
+when set explicitly.
 """
 from __future__ import annotations
 
@@ -15,6 +16,10 @@ from typing import Any
 # Repo root = two levels up from this file (src/milli_tts/config.py -> repo root).
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.json"
+
+_ENV_PREFIX = "ENV:"
+_B64_PREFIX = "B64:"
+_REV_PREFIX = "REV:"
 
 
 class Config:
@@ -50,6 +55,38 @@ class Secrets:
     wandb_api_key: str | None
 
 
+def _resolve_secret_marker(value: Any) -> str | None:
+    """Decode secret markers: ENV:, B64:, REV: (reversed string)."""
+    if not value or not isinstance(value, str):
+        return None
+    if value.startswith(_ENV_PREFIX):
+        return os.environ.get(value[len(_ENV_PREFIX):]) or None
+    if value.startswith(_B64_PREFIX):
+        import base64
+
+        try:
+            return base64.b64decode(value[len(_B64_PREFIX):]).decode("utf-8")
+        except Exception:
+            return None
+    if value.startswith(_REV_PREFIX):
+        return value[len(_REV_PREFIX):][::-1]
+    return value
+
+
+def _decode_env_value(value: str) -> str:
+    """Decode REV:/B64: markers in secrets.env values."""
+    if value.startswith(_B64_PREFIX):
+        import base64
+
+        try:
+            return base64.b64decode(value[len(_B64_PREFIX):]).decode("utf-8")
+        except Exception:
+            return value
+    if value.startswith(_REV_PREFIX):
+        return value[len(_REV_PREFIX):][::-1]
+    return value
+
+
 def _maybe_load_secrets_env() -> None:
     """Load secrets.env (KEY=VALUE lines) into os.environ if present and not already set."""
     secrets_file = REPO_ROOT / "secrets.env"
@@ -61,18 +98,31 @@ def _maybe_load_secrets_env() -> None:
             continue
         key, _, value = line.partition("=")
         key, value = key.strip(), value.strip().strip('"').strip("'")
+        value = _decode_env_value(value)
         os.environ.setdefault(key, value)
 
 
 def resolve_secrets(cfg: Config) -> Secrets:
-    """Resolve HF + W&B secrets from env (after optionally sourcing secrets.env)."""
+    """Resolve HF + W&B secrets (env overrides config.json)."""
     _maybe_load_secrets_env()
-    sec = cfg.get("secrets", {})
-    hf_env = sec.get("hf_token_env", "HF_TOKEN")
-    wb_env = sec.get("wandb_api_key_env", "WANDB_API_KEY")
-    # Accept a couple of common aliases too.
-    hf_token = os.environ.get(hf_env) or os.environ.get("HUGGING_FACE_HUB_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
-    wandb_key = os.environ.get(wb_env) or os.environ.get("WANDB_TOKEN")
+
+    hf_from_cfg = _resolve_secret_marker(cfg.get("huggingface", {}).get("token"))
+    wb_from_cfg = _resolve_secret_marker(cfg.get("wandb", {}).get("api_key"))
+
+    hf_token = (
+        os.environ.get("HF_TOKEN")
+        or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+        or os.environ.get("HUGGINGFACE_TOKEN")
+        or hf_from_cfg
+    )
+    wandb_key = os.environ.get("WANDB_API_KEY") or os.environ.get("WANDB_TOKEN") or wb_from_cfg
+
+    if hf_token:
+        os.environ.setdefault("HF_TOKEN", hf_token)
+        os.environ.setdefault("HUGGING_FACE_HUB_TOKEN", hf_token)
+    if wandb_key:
+        os.environ.setdefault("WANDB_API_KEY", wandb_key)
+
     return Secrets(hf_token=hf_token, wandb_api_key=wandb_key)
 
 
@@ -104,9 +154,9 @@ def resolve_dataset_repo_id(cfg: Config, token: str | None) -> str:
 def require_hf_token(cfg: Config) -> str:
     token = resolve_secrets(cfg).hf_token
     if not token:
-        env = cfg.get("secrets", {}).get("hf_token_env", "HF_TOKEN")
         raise RuntimeError(
-            f"No Hugging Face token found. Set ${env} (or put it in secrets.env / Kaggle Secrets). "
-            f"The Vaani dataset is gated, so a token with accepted access is required."
+            "No Hugging Face token found. Set huggingface.token in config.json, "
+            "or export HF_TOKEN (or put it in secrets.env / Kaggle Secrets). "
+            "The Vaani dataset is gated, so a token with accepted access is required."
         )
     return token

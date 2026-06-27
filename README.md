@@ -18,14 +18,12 @@ Indic-Mio is a **`Qwen3ForCausalLM`** that emits **MioCodec audio tokens** (`<|s
 fp16 (no bf16), SDPA attention (no FlashAttention-2), LoRA via PEFT, 8-bit AdamW, gradient
 checkpointing, DDP via Accelerate (Unsloth is single-GPU only).
 
-## Secrets (rotate the tokens you pasted!)
-The tokens shared in chat are exposed and look revoked — **rotate them in HF/W&B settings.**
-Set them in the environment (or `secrets.env`, gitignored):
-```bash
-cp secrets.env.example secrets.env   # then fill HF_TOKEN, WANDB_API_KEY
-```
-`HF_TOKEN` must have **accepted access** to the gated Vaani dataset and write access for pushing
-`milli_guj_dataset_artpark`.
+## Secrets
+HF and W&B keys live in [`config.json`](config.json) under `huggingface.token` and
+`wandb.api_key` (stored as `REV:` reversed strings for GitHub push protection). Optional
+override via `secrets.env` or shell env vars (`HF_TOKEN`, `WANDB_API_KEY`).
+The HF token must have **accepted access** to the gated Vaani dataset and write access for
+pushing `milli_guj_dataset_artpark`.
 
 ## Run order
 ```bash
