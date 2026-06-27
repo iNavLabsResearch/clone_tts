@@ -1,0 +1,118 @@
+{
+  "project": "milli-indic-mio-gujarati",
+  "seed": 42,
+
+  "model": {
+    "base_model_id": "SPRINGLab/Indic-Mio",
+    "dtype": "float16",
+    "attn_implementation": "sdpa",
+    "gradient_checkpointing": true,
+    "max_seq_len": 1024
+  },
+
+  "codec": {
+    "model_id": "Aratako/MioCodec-25Hz-24kHz",
+    "token_rate_hz": 25,
+    "speech_token_template": "<|s_{}|>"
+  },
+
+  "asr": {
+    "model_id": "ai4bharat/indic-conformer-600m-multilingual",
+    "language": "gu",
+    "decoding": "ctc",
+    "min_chars": 2,
+    "max_chars": 400,
+    "drop_empty": true
+  },
+
+  "dataset": {
+    "source": {
+      "repo": "ARTPARK-IISc/Vaani",
+      "configs": [
+        "Gujarat_DevbhoomiDwarka",
+        "Gujarat_Gandhinagar",
+        "Gujarat_Navsari",
+        "Gujarat_Valsad"
+      ],
+      "split": "train",
+      "language_filter": "Gujarati",
+      "state_filter": "Gujarat",
+      "min_dur_s": 1.0,
+      "max_dur_s": 20.0,
+      "audio_column": "audio",
+      "language_column": "language",
+      "state_column": "state",
+      "speaker_column": "speakerID",
+      "duration_column": "duration",
+      "gender_column": "gender",
+      "district_column": "district"
+    },
+    "output": {
+      "repo": "milli_guj_dataset_artpark",
+      "namespace": null,
+      "private": true,
+      "keep_audio": false,
+      "pause_tags": true,
+      "shard_rows": 500
+    }
+  },
+
+  "pauses": {
+    "enabled": true,
+    "min_silence_ms": 350,
+    "top_db": 30,
+    "tag": "<pause>"
+  },
+
+  "train": {
+    "output_dir": "outputs/indicmio-guj",
+    "dataset_repo": null,
+    "lora_r": 32,
+    "lora_alpha": 64,
+    "lora_dropout": 0.05,
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "learning_rate": 2e-4,
+    "lr_scheduler_type": "cosine",
+    "warmup_ratio": 0.03,
+    "weight_decay": 0.01,
+    "max_grad_norm": 1.0,
+    "num_train_epochs": 3,
+    "per_device_train_batch_size": 2,
+    "per_device_eval_batch_size": 2,
+    "gradient_accumulation_steps": 8,
+    "optim": "paged_adamw_8bit",
+    "eval_ratio": 0.05,
+    "eval_steps": 200,
+    "save_steps": 200,
+    "save_total_limit": 3,
+    "logging_steps": 10,
+    "fp16": true,
+    "bf16": false,
+    "dataloader_num_workers": 2
+  },
+
+  "wandb": {
+    "enabled": true,
+    "project": "milli-indic-mio-gujarati",
+    "run_name": "indicmio-guj-{timestamp}",
+    "log_model": false
+  },
+
+  "secrets": {
+    "hf_token_env": "HF_TOKEN",
+    "wandb_api_key_env": "WANDB_API_KEY"
+  },
+
+  "paths": {
+    "presets_dir": "presets",
+    "state_dir": "outputs/db_prep_state"
+  }
+}

@@ -1,0 +1,18 @@
+# Core training stack (Indic-Mio is a stock Qwen3 causal LM).
+# NOTE: on Kaggle, torch + torchaudio + CUDA are preinstalled; do not reinstall torch.
+transformers>=4.57.0
+peft>=0.13.0
+accelerate>=0.34.0
+datasets>=2.20.0
+bitsandbytes>=0.43.0        # paged_adamw_8bit on T4
+huggingface_hub>=0.25.0
+wandb>=0.17.0
+
+# Audio / codec / ASR
+soundfile>=0.12.1
+librosa>=0.10.0             # silence detection for <pause> tags
+# MioCodec (24 kHz codec) — installed from git in setup.sh:
+#   pip install git+https://github.com/Aratako/MioCodec
+
+# IndicConformer (ai4bharat/indic-conformer-600m-multilingual) loads via trust_remote_code.
+# Its remote code may require nemo_toolkit; setup.sh installs it best-effort.
